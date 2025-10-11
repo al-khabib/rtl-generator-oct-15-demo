@@ -1,6 +1,7 @@
 import { Application } from 'express';
-import healthRoutes from './health.routes';
+import { rateLimiter } from '../middlewares/rateLimiter';
+import testGeneratorRoutes from './test-generator';
 
 export const registerRoutes = (app: Application): void => {
-  app.use('/health', healthRoutes);
+  app.use('/api', rateLimiter, testGeneratorRoutes);
 };

@@ -1,23 +1,36 @@
 import { ErrorRequestHandler } from 'express';
-import { AppError } from '../utils/appError';
+import { ApiErrorResponse, ServiceError } from '../types';
 import { logger } from '../utils/logger';
 
-interface ErrorResponse {
-  message: string;
-  details?: unknown;
-}
-
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
-  const status = err instanceof AppError ? err.statusCode : 500;
-  const response: ErrorResponse = {
-    message: err instanceof AppError ? err.message : 'Internal Server Error'
+  const correlationId = res.locals.correlationId ?? req.correlationId;
+
+  const serviceError =
+    err instanceof ServiceError
+      ? err
+      : new ServiceError(
+          err instanceof Error ? err.message : 'Internal Server Error',
+          500,
+          'internal_error',
+          correlationId
+        );
+
+  const response: ApiErrorResponse = {
+    success: false,
+    error: {
+      message: serviceError.message,
+      code: serviceError.code,
+      correlationId,
+      details: serviceError.details
+    }
   };
 
-  if (err instanceof AppError && err.details) {
-    response.details = err.details;
-  }
+  logger.error(`Request failed [${req.method} ${req.originalUrl}]`, {
+    correlationId,
+    statusCode: serviceError.statusCode,
+    code: serviceError.code,
+    error: err instanceof Error ? err.stack : err
+  });
 
-  logger.error(`Request failed [${req.method} ${req.originalUrl}]`, err);
-
-  res.status(status).json(response);
+  res.status(serviceError.statusCode).json(response);
 };

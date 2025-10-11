@@ -1,6 +1,13 @@
 import { RequestHandler } from 'express';
-import { AppError } from '../utils/appError';
+import { ServiceError } from '../types';
 
 export const notFoundHandler: RequestHandler = (req, _res, next) => {
-  next(new AppError(404, `Resource not found: ${req.method} ${req.originalUrl}`));
+  next(
+    new ServiceError(
+      `Resource not found: ${req.method} ${req.originalUrl}`,
+      404,
+      'not_found',
+      req.correlationId
+    )
+  );
 };
