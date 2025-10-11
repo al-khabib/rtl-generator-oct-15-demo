@@ -1,0 +1,75 @@
+{
+  "name": "rtl-test-generator",
+  "displayName": "RTL Test Generator",
+  "description": "Automatically generate React Testing Library unit tests for UI components using AI",
+  "version": "0.0.1",
+  "publisher": "rtl-tools",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "RTL Test Generator"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onCommand:rtl-generator.generateTest",
+    "onView:rtl-generator-sidebar"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "rtl-generator.generateTest",
+        "title": "Generate RTL Test",
+        "category": "RTL Test Generator"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "rtl-generator.generateTest",
+          "group": "rtl",
+          "when": "resourceExtname == .tsx || resourceExtname == .jsx"
+        }
+      ]
+    },
+    "viewContainers": {
+      "activitybar": [
+        {
+          "id": "rtl-generator-sidebar",
+          "title": "RTL Generator",
+          "icon": "media/rtl-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "rtl-generator-sidebar": [
+        {
+          "id": "rtl-generator.sidebarView",
+          "name": "RTL Generator"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node ./esbuild.config.mjs",
+    "watch": "node ./esbuild.config.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && vsce package",
+    "vscode:prepublish": "npm run build",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "axios": "^1.7.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.82.0",
+    "@vscode/vsce": "^2.27.0",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.4.0"
+  }
+}
