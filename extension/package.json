@@ -34,6 +34,13 @@
           "group": "rtl",
           "when": "resourceExtname == .tsx || resourceExtname == .jsx"
         }
+      ],
+      "editor/context": [
+        {
+          "command": "rtl-generator.generateTest",
+          "group": "rtl",
+          "when": "editorLangId == typescriptreact || editorLangId == javascriptreact"
+        }
       ]
     },
     "viewContainers": {
@@ -52,6 +59,26 @@
           "name": "RTL Generator"
         }
       ]
+    },
+    "configuration": {
+      "title": "RTL Test Generator",
+      "properties": {
+        "rtlTestGenerator.apiGatewayUrl": {
+          "type": "string",
+          "default": "http://localhost:3000",
+          "description": "Base URL for the API gateway used to generate tests."
+        },
+        "rtlTestGenerator.testOutputDirectory": {
+          "type": "string",
+          "default": "__tests__",
+          "description": "Relative (from the component file) or absolute directory for generated tests."
+        },
+        "rtlTestGenerator.autoSaveGeneratedTests": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically save generated tests to disk. When disabled, tests open in an untitled editor."
+        }
+      }
     }
   },
   "scripts": {
