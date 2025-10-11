@@ -82,7 +82,10 @@
     }
   },
   "scripts": {
-    "build": "node ./esbuild.config.mjs",
+    "build:webview": "npm --prefix webview install --no-audit --no-fund && npm --prefix webview run build",
+    "dev:webview": "npm --prefix webview run dev",
+    "watch:webview": "npm --prefix webview run dev",
+    "build": "npm run build:webview && node ./esbuild.config.mjs",
     "watch": "node ./esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "package": "npm run build && vsce package",

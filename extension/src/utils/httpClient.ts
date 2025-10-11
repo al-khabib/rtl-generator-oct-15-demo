@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as vscode from 'vscode';
-import { ApiResponse, ComponentInfo, GeneratedTest } from '../types';
+import { ApiResponse, ComponentInfo, GeneratedTest, ServiceStatus } from '../types';
 
 const DEFAULT_TIMEOUT = 10000;
 const MAX_RETRIES = 2;
@@ -70,26 +70,43 @@ const clientRequest = async <T>(
 const generateTest = async (componentInfo: ComponentInfo): Promise<GeneratedTest> => {
   const client = createAxiosClient();
 
-  return clientRequest(async () => {
+  const result = await clientRequest(async () => {
     const { data } = await client.post<ApiResponse<GeneratedTest>>(
       '/api/generate-test',
       componentInfo
     );
     return data;
   });
+
+  return {
+    ...result,
+    generatedAt: result.generatedAt ?? new Date().toISOString()
+  };
 };
 
-const checkHealth = async (): Promise<boolean> => {
+const checkHealth = async (): Promise<ServiceStatus> => {
   const client = createAxiosClient();
 
   try {
-    await withRetry(async () => {
-      await client.get('/health');
+    const response = await withRetry(async () => {
+      const { data } = await client.get<ApiResponse<{ status: string; message?: string }>>(
+        '/health'
+      );
+      return data;
     });
-    return true;
+
+    return {
+      healthy: response?.success ?? true,
+      message: response?.message ?? response?.data?.message,
+      lastChecked: new Date().toISOString()
+    };
   } catch (error) {
     const message = extractErrorMessage(error);
-    throw new Error(`API health check failed: ${message}`);
+    return {
+      healthy: false,
+      message,
+      lastChecked: new Date().toISOString()
+    };
   }
 };
 

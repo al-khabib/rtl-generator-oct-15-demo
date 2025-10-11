@@ -2,10 +2,16 @@ import * as vscode from 'vscode';
 import { TextEncoder } from 'util';
 import * as path from 'path';
 import { detectReactComponent } from './providers/ComponentDetector';
-import { ComponentInfo, GeneratedTest } from './types';
+import { SidebarProvider } from './providers/SidebarProvider';
+import { ComponentInfo, GeneratedTest, ServiceStatus } from './types';
 import { httpClient } from './utils/httpClient';
 
 const getConfiguration = () => vscode.workspace.getConfiguration('rtlTestGenerator');
+
+interface SaveResult {
+  uri: vscode.Uri;
+  savedToDisk: boolean;
+}
 
 const sendToBackend = async (componentInfo: ComponentInfo): Promise<GeneratedTest> => {
   return httpClient.generateTest(componentInfo);
@@ -14,7 +20,7 @@ const sendToBackend = async (componentInfo: ComponentInfo): Promise<GeneratedTes
 const saveGeneratedTest = async (
   generatedTest: GeneratedTest,
   componentInfo: ComponentInfo
-): Promise<vscode.Uri> => {
+): Promise<SaveResult> => {
   const configuration = getConfiguration();
   const outputDirectorySetting = configuration.get<string>('testOutputDirectory') ?? '__tests__';
   const autoSaveEnabled = configuration.get<boolean>('autoSaveGeneratedTests') ?? false;
@@ -30,7 +36,7 @@ const saveGeneratedTest = async (
         fileName.endsWith('.tsx') || fileName.endsWith('.jsx') ? 'typescriptreact' : 'typescript'
     });
     await vscode.window.showTextDocument(document, { preview: false });
-    return document.uri;
+    return { uri: document.uri, savedToDisk: false };
   }
 
   const componentDirectory = path.dirname(componentInfo.filePath);
@@ -66,7 +72,7 @@ const saveGeneratedTest = async (
   const document = await vscode.workspace.openTextDocument(fileUri);
   await vscode.window.showTextDocument(document, { preview: false });
 
-  return fileUri;
+  return { uri: fileUri, savedToDisk: true };
 };
 
 const validateDocument = async (uri?: vscode.Uri): Promise<vscode.TextDocument> => {
@@ -83,6 +89,12 @@ const validateDocument = async (uri?: vscode.Uri): Promise<vscode.TextDocument> 
 };
 
 export function activate(context: vscode.ExtensionContext) {
+  const sidebarProvider = new SidebarProvider(context);
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(SidebarProvider.viewType, sidebarProvider)
+  );
+
   const generateTestCommand = vscode.commands.registerCommand(
     'rtl-generator.generateTest',
     async (resource?: vscode.Uri) => {
@@ -138,6 +150,8 @@ export function activate(context: vscode.ExtensionContext) {
         }
       }
 
+      sidebarProvider.handleGenerationStart(componentInfo);
+
       await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
@@ -147,12 +161,13 @@ export function activate(context: vscode.ExtensionContext) {
         async (progress) => {
           progress.report({ message: 'Checking service availability…' });
 
-          try {
-            await httpClient.checkHealth();
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : 'Service health check failed.';
+          const status: ServiceStatus = await httpClient.checkHealth();
+          await sidebarProvider.updateStatus(status);
+
+          if (!status.healthy) {
+            const message = status.message ?? 'API gateway is unavailable.';
             vscode.window.showErrorMessage(message);
+            await sidebarProvider.handleGenerationError(componentInfo, message);
             return;
           }
 
@@ -161,18 +176,34 @@ export function activate(context: vscode.ExtensionContext) {
           try {
             const generatedTest = await sendToBackend(componentInfo);
             progress.report({ message: 'Preparing test output…' });
-            await saveGeneratedTest(generatedTest, componentInfo);
+            const { uri: outputUri, savedToDisk } = await saveGeneratedTest(generatedTest, componentInfo);
+            const generatedAt = generatedTest.generatedAt ?? new Date().toISOString();
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(outputUri);
+            const relativePath = savedToDisk && workspaceFolder
+              ? path.relative(workspaceFolder.uri.fsPath, outputUri.fsPath)
+              : savedToDisk
+              ? outputUri.fsPath
+              : undefined;
+
+            await sidebarProvider.handleGenerationSuccess(componentInfo, {
+              ...generatedTest,
+              generatedAt,
+              relativePath
+            });
             vscode.window.showInformationMessage(
               `Generated RTL test for ${componentInfo.name}.`
             );
           } catch (error) {
             if (error instanceof Error && error.message === 'Operation cancelled by user.') {
-              vscode.window.showInformationMessage('RTL test generation cancelled.');
+              const message = 'RTL test generation cancelled.';
+              vscode.window.showInformationMessage(message);
+              await sidebarProvider.handleGenerationError(componentInfo, message);
               return;
             }
             const message =
               error instanceof Error ? error.message : 'Failed to generate RTL test.';
             vscode.window.showErrorMessage(message);
+            await sidebarProvider.handleGenerationError(componentInfo, message);
           }
         }
       );

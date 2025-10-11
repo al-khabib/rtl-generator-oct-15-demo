@@ -4,6 +4,7 @@ tsconfig.json
 esbuild.config.mjs
 README.md
 src/**
+webview/**
 **/*.ts
 **/*.map
 package-lock.json
