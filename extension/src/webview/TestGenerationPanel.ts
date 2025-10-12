@@ -43,6 +43,7 @@ type PanelIncomingMessage =
 interface ManifestEntry {
   file: string;
   css?: string[];
+  imports?: string[];
 }
 
 interface GenerationContext {
@@ -162,7 +163,7 @@ export class TestGenerationPanel implements vscode.Disposable {
         <html lang="en">
           <head>
             <meta charset="UTF-8" />
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; script-src 'nonce-${nonce}' ${cspSource}; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource};" />
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; script-src 'nonce-${nonce}' ${cspSource}; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource} data:;" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
             ${styleUris.map((uri) => `<link rel="stylesheet" href="${uri}" />`).join('\n')}
             <title>RTL Test Preview</title>
@@ -372,22 +373,40 @@ export class TestGenerationPanel implements vscode.Disposable {
   }> {
     const manifest = await this.loadWebviewManifest();
 
-    const entry = manifest[entryPoint] ?? manifest[`src/${entryPoint.replace('.html', '/main.tsx')}`];
+    const entryKey = entryPoint in manifest ? entryPoint : `src/${entryPoint.replace('.html', '/main.tsx')}`;
+    const entry = manifest[entryKey];
 
     if (!entry) {
       throw new Error(`Webview manifest missing entry for ${entryPoint}`);
     }
 
+    const collectedCss = new Set<string>();
+    const visited = new Set<string>();
+
+    const collectCss = (key: string): void => {
+      if (visited.has(key)) {
+        return;
+      }
+      visited.add(key);
+      const chunk = manifest[key];
+      if (!chunk) {
+        return;
+      }
+      chunk.css?.forEach((cssPath) => collectedCss.add(cssPath));
+      chunk.imports?.forEach((importKey: string) => collectCss(importKey));
+    };
+
+    collectCss(entryKey);
+
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionContext.extensionUri, 'dist', 'webview', entry.file)
     );
 
-    const styleUris =
-      entry.css?.map((cssPath) =>
-        webview.asWebviewUri(
-          vscode.Uri.joinPath(this.extensionContext.extensionUri, 'dist', 'webview', cssPath)
-        )
-      ) ?? [];
+    const styleUris = Array.from(collectedCss).map((cssPath) =>
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.extensionContext.extensionUri, 'dist', 'webview', cssPath)
+      )
+    );
 
     return { scriptUri, styleUris };
   }
