@@ -35,7 +35,7 @@ type PanelIncomingMessage =
     }
   | {
       type: 'approve';
-      payload: { displayName?: string };
+      payload: { displayName?: string; content?: string };
     }
   | { type: 'copy'; payload?: { content?: string } }
   | { type: 'close' };
@@ -194,11 +194,14 @@ export class TestGenerationPanel implements vscode.Disposable {
       }
       case 'approve': {
         const displayName = message.payload.displayName ?? this.contextState.displayName;
-        await this.handleApprove(displayName);
+        const content = message.payload.content;
+        await this.handleApprove(displayName, content);
         break;
       }
       case 'copy':
-        await vscode.env.clipboard.writeText(this.contextState.generatedTest.content);
+        await vscode.env.clipboard.writeText(
+          message.payload?.content ?? this.contextState.generatedTest.content
+        );
         vscode.window.showInformationMessage('Generated test copied to clipboard.');
         break;
       case 'close':
@@ -261,14 +264,19 @@ export class TestGenerationPanel implements vscode.Disposable {
     }
   }
 
-  private async handleApprove(displayName: string): Promise<void> {
+  private async handleApprove(displayName: string, content?: string): Promise<void> {
     const effectiveDisplayName = displayName.trim().length ? displayName.trim() : this.contextState.displayName;
+    const sanitizedContent = typeof content === 'string' ? content : this.contextState.generatedTest.content;
     this.contextState = {
       ...this.contextState,
       displayName: effectiveDisplayName,
       componentInfo: {
         ...this.contextState.componentInfo,
         displayName: effectiveDisplayName
+      },
+      generatedTest: {
+        ...this.contextState.generatedTest,
+        content: sanitizedContent
       }
     };
 
@@ -303,7 +311,7 @@ export class TestGenerationPanel implements vscode.Disposable {
       await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(selection.fsPath)));
 
       const encoder = new TextEncoder();
-      await vscode.workspace.fs.writeFile(selection, encoder.encode(this.contextState.generatedTest.content));
+      await vscode.workspace.fs.writeFile(selection, encoder.encode(sanitizedContent));
       const document = await vscode.workspace.openTextDocument(selection);
       await vscode.window.showTextDocument(document, { preview: false });
 
@@ -328,7 +336,8 @@ export class TestGenerationPanel implements vscode.Disposable {
         ...this.contextState,
         generatedTest: {
           ...this.contextState.generatedTest,
-          relativePath: relativePath ?? selection.fsPath
+          relativePath: relativePath ?? selection.fsPath,
+          content: sanitizedContent
         }
       };
 

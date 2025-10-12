@@ -63,6 +63,8 @@ const PanelApp: React.FC = () => {
   const [phase, setPhase] = useState<GenerationPhase>('loading');
   const [statusMessage, setStatusMessage] = useState<string>('Preparing initial test output…');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState<string>('');
 
   useEffect(() => {
     const handler = (event: MessageEvent<PanelMessageFromExtension>) => {
@@ -80,18 +82,21 @@ const PanelApp: React.FC = () => {
           setPhase('idle');
           setStatusMessage('Review the generated test before approving or regenerating.');
           setErrorMessage(null);
+          setIsEditing(false);
           break;
         }
         case 'generation:started':
           setPhase('loading');
           setStatusMessage('Regenerating test with updated instructions…');
           setErrorMessage(null);
+          setIsEditing(false);
           break;
         case 'generation:success':
           setGeneratedTest(message.payload.generatedTest);
           setPhase('idle');
           setStatusMessage('Generation complete. Review the updated test before approving.');
           setErrorMessage(null);
+          setIsEditing(false);
           break;
         case 'generation:error':
           setPhase('error');
@@ -110,6 +115,7 @@ const PanelApp: React.FC = () => {
             current
               ? {
                   ...current,
+                  content: editedContent,
                   relativePath: message.payload.relativePath ?? message.payload.filePath
                 }
               : current
@@ -132,6 +138,14 @@ const PanelApp: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (generatedTest) {
+      setEditedContent(generatedTest.content);
+    } else {
+      setEditedContent('');
+    }
+  }, [generatedTest]);
+
   const metadataEntries = useMemo(() => extractMetadataEntries(generatedTest), [generatedTest]);
 
   const handleRegenerate = () => {
@@ -141,6 +155,7 @@ const PanelApp: React.FC = () => {
       instructions: trimmedInstructions.length ? trimmedInstructions : undefined,
       displayName: trimmedName.length ? trimmedName : component?.name
     });
+    setIsEditing(false);
   };
 
   const handleRetry = () => {
@@ -155,12 +170,18 @@ const PanelApp: React.FC = () => {
   const handleApprove = () => {
     const trimmedName = displayName.trim();
     postMessage('approve', {
-      displayName: trimmedName.length ? trimmedName : component?.name
+      displayName: trimmedName.length ? trimmedName : component?.name,
+      content: editedContent
     });
   };
 
   const handleCopy = () => {
-    postMessage('copy');
+    if (!editedContent) {
+      return;
+    }
+    postMessage('copy', { content: editedContent });
+    setStatusMessage('Test content copied to clipboard.');
+    setErrorMessage(null);
   };
 
   const handleClose = () => {
@@ -213,11 +234,27 @@ const PanelApp: React.FC = () => {
       )}
 
       <section className="flex-1 overflow-auto rounded border border-border bg-[var(--vscode-editor-background)] p-3 shadow-panel">
-        <h2 className="mb-3 text-sm font-semibold">Generated Test Preview</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold">Generated Test Preview</h2>
+          <button
+            type="button"
+            className="rounded border border-border px-3 py-1 text-xs font-medium text-foreground hover:bg-[var(--vscode-editor-background)]"
+            onClick={() => setIsEditing((prev) => !prev)}
+            disabled={!generatedTest || phase === 'loading'}
+          >
+            {isEditing ? 'Lock Preview' : 'Edit Test'}
+          </button>
+        </div>
         {generatedTest ? (
-          <pre className="max-h-[60vh] overflow-auto whitespace-pre text-xs text-foreground">
-            {generatedTest.content}
-          </pre>
+          <textarea
+            value={editedContent}
+            onChange={(event) => setEditedContent(event.target.value)}
+            readOnly={!isEditing}
+            spellCheck={false}
+            className={`h-[60vh] w-full resize-none rounded border border-border bg-[var(--vscode-editor-background)] p-3 font-mono text-xs ${
+              isEditing ? 'focus:outline-none focus:ring-2 focus:ring-accent' : 'cursor-not-allowed'
+            }`}
+          />
         ) : (
           <p className="text-xs text-muted">Generated test content will appear here.</p>
         )}
@@ -254,8 +291,8 @@ const PanelApp: React.FC = () => {
         </div>
       </section>
 
-      <footer className="sticky bottom-0 flex flex-col gap-2 border-t border-border pt-3">
-        <div className="flex justify-between">
+      <footer className="sticky bottom-0 flex flex-col gap-3 border-t border-border pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             className="rounded border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-[var(--vscode-editor-background)]"
@@ -272,7 +309,7 @@ const PanelApp: React.FC = () => {
             Close Panel
           </button>
         </div>
-        <div className="flex items-center justify-between space-x-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             className="rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accentHover disabled:opacity-70"

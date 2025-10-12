@@ -26,6 +26,6 @@ export type PanelMessageToExtension =
   | { type: 'ready' }
   | { type: 'regenerate'; payload: { instructions?: string; displayName?: string } }
   | { type: 'retry'; payload?: { instructions?: string; displayName?: string } }
-  | { type: 'approve'; payload: { displayName?: string } }
-  | { type: 'copy' }
+  | { type: 'approve'; payload: { displayName?: string; content?: string } }
+  | { type: 'copy'; payload?: { content?: string } }
   | { type: 'close' };
