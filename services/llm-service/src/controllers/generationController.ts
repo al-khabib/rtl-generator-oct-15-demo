@@ -5,6 +5,7 @@ import { buildPrompt } from '../prompts/testPromptBuilder';
 import { ollamaClient } from '../services/ollamaClient';
 import { logger } from '../utils/logger';
 import { config } from '../utils/config';
+import { formatGeneratedTest } from '../utils/formatter';
 
 const propSchema = z.object({
   name: z.string(),
@@ -85,11 +86,13 @@ export const generateTest = async (req: Request, res: Response, next: NextFuncti
     });
 
     const result = await ollamaClient.generateTest(prompt, payload.options);
+    const formattedContent = await formatGeneratedTest(result.content);
 
     res.json({
       success: true,
       data: {
         ...result,
+        content: formattedContent,
         metadata: {
           ...(result.metadata ?? {}),
           component: payload.analysis.name,

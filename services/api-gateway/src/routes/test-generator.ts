@@ -82,7 +82,7 @@ router.post(
 
       const analysis = await serviceClient.analyzeCode(componentInfo, correlationId);
       const generatedTest = await serviceClient.generateTest(analysis, correlationId);
-      const validation = await serviceClient.validateTest(generatedTest, correlationId);
+      const validation = await serviceClient.validateTest(generatedTest, analysis, correlationId);
 
       if (!validation.valid) {
         throw ServiceError.validation(

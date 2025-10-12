@@ -160,14 +160,24 @@ export class ServiceClient {
     );
   }
 
-  async validateTest(generatedTest: GeneratedTest, correlationId?: string): Promise<ValidationResult> {
+  async validateTest(
+    generatedTest: GeneratedTest,
+    componentAnalysis: ComponentAnalysis,
+    correlationId?: string
+  ): Promise<ValidationResult> {
     return this.executeWithCircuit('test-validation', correlationId, () =>
       this.requestWithRetry<ApiSuccessResponse<ValidationResult>>(
         this.testValidationClient,
         {
           method: 'POST',
           url: '/api/validate',
-          data: generatedTest
+          data: {
+            generatedTest,
+            component: {
+              name: componentAnalysis.name,
+              complexity: componentAnalysis.complexity
+            }
+          }
         },
         'test-validation',
         correlationId

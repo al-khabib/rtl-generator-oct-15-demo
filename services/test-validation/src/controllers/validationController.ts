@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { parse } from '@babel/parser';
 import { ZodError } from 'zod';
 import { ValidationResult } from '../types';
 import { logger } from '../utils/logger';
@@ -47,6 +48,22 @@ const evaluateTest = (content: string): { valid: boolean; issues: string[] } => 
   };
 };
 
+const detectSyntaxIssues = (content: string): string[] => {
+  try {
+    parse(content, {
+      sourceType: 'module',
+      plugins: ['jsx', 'typescript', 'classProperties', 'decorators-legacy']
+    });
+    return [];
+  } catch (error) {
+    if (error instanceof Error) {
+      const message = error.message.replace(/\s*\(\d+:\d+\)$/, '').trim();
+      return [`Syntax error detected in generated test: ${message}`];
+    }
+    return ['Syntax error detected in generated test.'];
+  }
+};
+
 export const validateGeneratedTest = (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = envelopeSchema.parse(req.body);
@@ -54,23 +71,26 @@ export const validateGeneratedTest = (req: Request, res: Response, next: NextFun
       'generatedTest' in parsed ? parsed.generatedTest : parsed;
     const component = 'generatedTest' in parsed ? parsed.component : undefined;
 
-    const result = evaluateTest(generatedTest.content);
+    const baseResult = evaluateTest(generatedTest.content);
+    const syntaxIssues = detectSyntaxIssues(generatedTest.content);
+    const combinedIssues = [...baseResult.issues, ...syntaxIssues];
+    const isValid = combinedIssues.length === 0;
 
     const response: ValidationResult = {
-      valid: result.valid,
-      issues: result.issues,
+      valid: isValid,
+      issues: combinedIssues,
       generatedTest
     };
 
-    if (result.valid) {
+    if (isValid) {
       logger.info('Generated test passed validation.', {
         component: component?.name,
-        issues: result.issues.length
+        issues: combinedIssues.length
       });
     } else {
       logger.warn('Generated test reported validation issues.', {
         component: component?.name,
-        issues: result.issues
+        issues: combinedIssues
       });
     }
 
