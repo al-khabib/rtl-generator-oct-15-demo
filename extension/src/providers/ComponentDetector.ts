@@ -150,6 +150,7 @@ export const detectReactComponent = async (
     code: text,
     props,
     imports,
-    hasTests
+    hasTests,
+    displayName: componentName
   };
 };

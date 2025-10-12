@@ -29,7 +29,11 @@ const TestPreview: React.FC<TestPreviewProps> = ({ generatedTest, isGenerating, 
         <div className="rounded border border-border bg-[var(--vscode-editor-background)] p-3 shadow-panel">
           <div className="mb-2 flex items-center justify-between text-xs text-muted">
             <span>{generatedTest.fileName}</span>
-            <span>{new Date(generatedTest.generatedAt).toLocaleTimeString()}</span>
+            <span>
+              {generatedTest.generatedAt
+                ? new Date(generatedTest.generatedAt).toLocaleTimeString()
+                : '—'}
+            </span>
           </div>
           <pre className="whitespace-pre-wrap break-words rounded bg-[var(--vscode-editor-background)] p-2 font-mono text-xs">
             {generatedTest.content}

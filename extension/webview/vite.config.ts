@@ -17,6 +17,10 @@ export default defineConfig({
     sourcemap: true,
     manifest: true,
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        panel: path.resolve(__dirname, 'panel.html')
+      },
       output: {
         assetFileNames: assetInfo => {
           if (assetInfo.name && assetInfo.name.endsWith('.css')) {

@@ -5,6 +5,9 @@ export interface ComponentInfo {
   props: string | null;
   imports: string[];
   hasTests: boolean;
+  displayName?: string;
+  instructions?: string;
+  source?: 'full' | 'selection';
 }
 
 export interface GeneratedTest {
@@ -12,6 +15,9 @@ export interface GeneratedTest {
   content: string;
   relativePath?: string;
   generatedAt?: string;
+  model?: string;
+  metadata?: Record<string, unknown>;
+  summary?: string;
 }
 
 export interface ApiResponse<T> {

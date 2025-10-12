@@ -22,7 +22,10 @@ const componentSchema = z.object({
   code: z.string().min(1, 'Component source code is required.'),
   props: z.string().nullable().optional(),
   imports: z.array(z.string()).default([]),
-  hasTests: z.boolean()
+  hasTests: z.boolean(),
+  displayName: z.string().optional(),
+  instructions: z.string().optional(),
+  source: z.enum(['full', 'selection']).optional()
 });
 
 const buildSuccessResponse = <T>(correlationId: string | undefined, data: T): ApiSuccessResponse<T> => ({
@@ -78,11 +81,33 @@ router.post(
     try {
       const componentInfo = req.body;
 
+      if (componentInfo.displayName) {
+        const trimmedDisplayName = componentInfo.displayName.trim();
+        componentInfo.displayName = trimmedDisplayName.length ? trimmedDisplayName : undefined;
+      }
+
+      if (componentInfo.instructions) {
+        const trimmedInstructions = componentInfo.instructions.trim();
+        componentInfo.instructions = trimmedInstructions.length ? trimmedInstructions : undefined;
+      }
+
       logger.info(`Generating test for component ${componentInfo.name}`, { correlationId });
 
       const analysis = await serviceClient.analyzeCode(componentInfo, correlationId);
-      const generatedTest = await serviceClient.generateTest(analysis, correlationId);
-      const validation = await serviceClient.validateTest(generatedTest, analysis, correlationId);
+      const enrichedAnalysis = {
+        ...analysis,
+        metadata: {
+          ...(analysis.metadata ?? {}),
+          displayName: componentInfo.displayName ?? componentInfo.name,
+          source: componentInfo.source ?? 'full',
+          instructions:
+            typeof componentInfo.instructions === 'string' && componentInfo.instructions.trim().length
+              ? componentInfo.instructions.trim()
+              : undefined
+        }
+      };
+      const generatedTest = await serviceClient.generateTest(enrichedAnalysis, correlationId);
+      const validation = await serviceClient.validateTest(generatedTest, enrichedAnalysis, correlationId);
 
       if (!validation.valid) {
         throw ServiceError.validation(
@@ -92,10 +117,35 @@ router.post(
         );
       }
 
+      const displayName = componentInfo.displayName ?? analysis.name ?? componentInfo.name;
+      const normalizedFileName =
+        validation.generatedTest.fileName ??
+        generatedTest.fileName ??
+        `${displayName.replace(/\s+/g, '')}.test.tsx`;
+      const instructions =
+        typeof componentInfo.instructions === 'string' && componentInfo.instructions.trim().length
+          ? componentInfo.instructions.trim()
+          : undefined;
+
       const testWithMetadata: GeneratedTest = {
         ...validation.generatedTest,
+        fileName: normalizedFileName,
         relativePath: validation.generatedTest.relativePath ?? generatedTest.relativePath
       };
+
+      if (!testWithMetadata.generatedAt) {
+        testWithMetadata.generatedAt = new Date().toISOString();
+      }
+
+      if (instructions || enrichedAnalysis.metadata) {
+        testWithMetadata.metadata = {
+          ...(generatedTest.metadata ?? {}),
+          ...(validation.generatedTest.metadata ?? {}),
+          instructions,
+          displayName,
+          source: componentInfo.source ?? 'full'
+        };
+      }
 
       res.status(httpStatus.ok).json(buildSuccessResponse(correlationId, testWithMetadata));
     } catch (error) {

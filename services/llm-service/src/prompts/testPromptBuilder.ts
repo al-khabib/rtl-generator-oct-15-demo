@@ -46,18 +46,34 @@ const formatTestingRecommendations = (analysis: ComponentAnalysis): string => {
   return analysis.testingRecommendations.map((rec) => `- ${rec}`).join('\n');
 };
 
-export const buildPrompt = (
-  analysis: ComponentAnalysis,
-  builderOptions?: PromptBuilderOptions
-): string => {
-  const header = `System: You are an expert React Testing Library test generator. Respond with idiomatic tests that follow best practices.`;
+export const buildPrompt = (analysis: ComponentAnalysis, builderOptions?: PromptBuilderOptions): string => {
+  const header =
+    'System: You are an expert React Testing Library test generator. Respond with idiomatic tests that follow best practices.';
 
-  const componentSummary = `Component Overview:
-- Name: ${analysis.name}
-- Type: ${analysis.type}
-- Complexity Score: ${analysis.complexity}
-- Data Test IDs: ${analysis.dataTestIds.length ? analysis.dataTestIds.join(', ') : 'none'}
-`;
+  const metadata = (analysis.metadata ?? {}) as Record<string, unknown>;
+  const displayName =
+    typeof metadata.displayName === 'string' && metadata.displayName.trim().length
+      ? metadata.displayName.trim()
+      : analysis.name;
+  const userInstructions =
+    typeof metadata.instructions === 'string' && metadata.instructions.trim().length
+      ? metadata.instructions.trim()
+      : null;
+  const sourceDescription =
+    typeof metadata.source === 'string' && metadata.source.trim().length
+      ? metadata.source === 'selection'
+        ? 'Only a selection of the component was provided. Avoid assumptions about omitted code.'
+        : 'The full component file was provided.'
+      : null;
+
+  const summaryLines = [
+    `- Name: ${analysis.name}`,
+    ...(displayName !== analysis.name ? [`- Preferred Display Name: ${displayName}`] : []),
+    `- Type: ${analysis.type}`,
+    `- Complexity Score: ${analysis.complexity}`,
+    `- Data Test IDs: ${analysis.dataTestIds.length ? analysis.dataTestIds.join(', ') : 'none'}`
+  ];
+  const componentSummary = `Component Overview:\n${summaryLines.join('\n')}`;
 
   const propsSection = `Props:
 ${formatProps(analysis)}
@@ -83,6 +99,17 @@ ${analysis.imports.length ? analysis.imports.map((imp) => `- ${imp.source} (${[i
 ${formatTestingRecommendations(analysis)}
 `;
 
+  const contextualNotes =
+    sourceDescription || userInstructions
+      ? [
+          'Contextual Notes:',
+          sourceDescription ? `- ${sourceDescription}` : null,
+          userInstructions ? `- User emphasis: ${userInstructions}` : null
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : '';
+
   const instructions = `Instructions:
 1. Write React Testing Library tests using TypeScript.
 2. Import only what is required for the tests.
@@ -107,6 +134,7 @@ ${builderOptions.examples.join('\n---\n')}
     handlersSection,
     importsSection,
     recommendationsSection,
+    contextualNotes,
     examplesSection,
     instructions,
     `Begin the test file now.`

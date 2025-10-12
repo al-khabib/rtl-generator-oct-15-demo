@@ -78,7 +78,7 @@ const App: React.FC = () => {
             {
               componentName: message.payload.componentName,
               filePath: message.payload.relativePath ?? '',
-              timestamp: message.payload.generatedAt,
+              timestamp: message.payload.generatedAt ?? new Date().toISOString(),
               status: 'success',
               generatedTest: message.payload
             },

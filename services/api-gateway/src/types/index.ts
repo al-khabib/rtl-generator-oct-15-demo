@@ -26,6 +26,9 @@ export interface ComponentInfo {
   props?: string | null;
   imports: string[];
   hasTests: boolean;
+  displayName?: string;
+  instructions?: string | null;
+  source?: 'full' | 'selection';
 }
 
 export type ComponentType = 'functional' | 'class';
@@ -78,12 +81,13 @@ export interface ComponentAnalysis {
 
 export interface GeneratedTest {
   content: string;
-  model: string;
+  model?: string;
   prompt: string;
   metadata?: Record<string, unknown>;
   fileName?: string;
   relativePath?: string;
   summary?: string;
+  generatedAt?: string;
 }
 
 export interface ValidationResult {

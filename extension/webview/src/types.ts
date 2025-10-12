@@ -8,7 +8,10 @@ export interface GeneratedTest {
   fileName: string;
   content: string;
   relativePath?: string;
-  generatedAt: string;
+  generatedAt?: string;
+  model?: string;
+  metadata?: Record<string, unknown>;
+  summary?: string;
 }
 
 export interface ServiceStatus {
