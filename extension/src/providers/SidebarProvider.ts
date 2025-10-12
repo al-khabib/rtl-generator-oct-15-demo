@@ -233,13 +233,31 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       </html>`;
   }
 
+  private async loadWebviewManifest(): Promise<Record<string, ManifestEntry>> {
+    const manifestCandidates = [
+      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'manifest.json'),
+      vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', '.vite', 'manifest.json')
+    ];
+
+    for (const candidate of manifestCandidates) {
+      try {
+        const manifestContent = await vscode.workspace.fs.readFile(candidate);
+        return JSON.parse(new TextDecoder().decode(manifestContent)) as Record<string, ManifestEntry>;
+      } catch (error) {
+        if (error instanceof vscode.FileSystemError && error.code !== 'FileNotFound') {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Failed to locate webview asset manifest.');
+  }
+
   private async getWebviewAssets(webview: vscode.Webview): Promise<{
     scriptUri: vscode.Uri;
     styleUris: vscode.Uri[];
   }> {
-    const manifestUri = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'manifest.json');
-    const manifestContent = await vscode.workspace.fs.readFile(manifestUri);
-    const manifest = JSON.parse(new TextDecoder().decode(manifestContent)) as Record<string, ManifestEntry>;
+    const manifest = await this.loadWebviewManifest();
 
     const entry = manifest['index.html'] ?? manifest['src/main.tsx'];
 

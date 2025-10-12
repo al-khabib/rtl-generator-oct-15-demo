@@ -40,6 +40,11 @@ type PanelIncomingMessage =
   | { type: 'copy'; payload?: { content?: string } }
   | { type: 'close' };
 
+interface ManifestEntry {
+  file: string;
+  css?: string[];
+}
+
 interface GenerationContext {
   componentInfo: ComponentInfo;
   generatedTest: GeneratedTest;
@@ -148,26 +153,31 @@ export class TestGenerationPanel implements vscode.Disposable {
   }
 
   private async initializeWebview(): Promise<void> {
-    const { scriptUri, styleUris } = await this.getWebviewAssets(this.panel.webview, 'panel.html');
-    const nonce = this.generateNonce();
-    const cspSource = this.panel.webview.cspSource;
+    try {
+      const { scriptUri, styleUris } = await this.getWebviewAssets(this.panel.webview, 'panel.html');
+      const nonce = this.generateNonce();
+      const cspSource = this.panel.webview.cspSource;
 
-    this.panel.webview.html = `<!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8" />
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; script-src 'nonce-${nonce}' ${cspSource}; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource};" />
-          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          ${styleUris
-            .map((uri) => `<link rel="stylesheet" href="${uri}" />`)
-            .join('\n')}
-          <title>RTL Test Preview</title>
-        </head>
-        <body>
-          <div id="root"></div>
-          <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
-        </body>
-      </html>`;
+      this.panel.webview.html = `<!DOCTYPE html>
+        <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; script-src 'nonce-${nonce}' ${cspSource}; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource};" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            ${styleUris.map((uri) => `<link rel="stylesheet" href="${uri}" />`).join('\n')}
+            <title>RTL Test Preview</title>
+          </head>
+          <body>
+            <div id="root"></div>
+            <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
+          </body>
+        </html>`;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load test preview resources.';
+      vscode.window.showErrorMessage(message);
+      this.panel.webview.html = `<html><body style="font-family: sans-serif; padding: 1rem;"><h3>Failed to load test preview</h3><p>${message}</p></body></html>`;
+    }
   }
 
   private async handleMessage(message: PanelIncomingMessage): Promise<void> {
@@ -197,6 +207,26 @@ export class TestGenerationPanel implements vscode.Disposable {
       default:
         break;
     }
+  }
+
+  private async loadWebviewManifest(): Promise<Record<string, ManifestEntry>> {
+    const manifestCandidates = [
+      vscode.Uri.joinPath(this.extensionContext.extensionUri, 'dist', 'webview', 'manifest.json'),
+      vscode.Uri.joinPath(this.extensionContext.extensionUri, 'dist', 'webview', '.vite', 'manifest.json')
+    ];
+
+    for (const candidate of manifestCandidates) {
+      try {
+        const bytes = await vscode.workspace.fs.readFile(candidate);
+        return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, ManifestEntry>;
+      } catch (error) {
+        if (error instanceof vscode.FileSystemError && error.code !== 'FileNotFound') {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Failed to locate test panel webview manifest.');
   }
 
   private async handleRegeneration(instructions: string, displayName: string): Promise<void> {
@@ -331,17 +361,7 @@ export class TestGenerationPanel implements vscode.Disposable {
     scriptUri: vscode.Uri;
     styleUris: vscode.Uri[];
   }> {
-    const manifestUri = vscode.Uri.joinPath(
-      this.extensionContext.extensionUri,
-      'dist',
-      'webview',
-      'manifest.json'
-    );
-    const manifestContent = await vscode.workspace.fs.readFile(manifestUri);
-    const manifest = JSON.parse(new TextDecoder().decode(manifestContent)) as Record<
-      string,
-      { file: string; css?: string[] }
-    >;
+    const manifest = await this.loadWebviewManifest();
 
     const entry = manifest[entryPoint] ?? manifest[`src/${entryPoint.replace('.html', '/main.tsx')}`];
 
