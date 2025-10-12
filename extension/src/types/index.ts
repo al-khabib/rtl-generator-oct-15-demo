@@ -1,6 +1,7 @@
 export interface ComponentInfo {
   name: string;
   filePath: string;
+  code: string;
   props: string | null;
   imports: string[];
   hasTests: boolean;

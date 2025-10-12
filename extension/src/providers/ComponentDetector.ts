@@ -147,6 +147,7 @@ export const detectReactComponent = async (
   return {
     name: componentName,
     filePath: document.uri.fsPath,
+    code: text,
     props,
     imports,
     hasTests

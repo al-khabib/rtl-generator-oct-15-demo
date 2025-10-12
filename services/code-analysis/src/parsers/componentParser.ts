@@ -65,18 +65,16 @@ const extractTypeNameFromAnnotation = (annotation: t.TSType): string | null => {
   return null;
 };
 
-const getTypeFromAnnotation = (
-  annotation?: t.TSTypeAnnotation | t.TypeAnnotation | t.Noop | null
-): t.TSType | null => {
+const getTypeFromAnnotation = (annotation?: unknown): t.TSType | null => {
   if (!annotation) {
     return null;
   }
 
-  if (t.isTSTypeAnnotation(annotation)) {
-    return annotation.typeAnnotation;
+  if (t.isTSTypeAnnotation(annotation as t.Node)) {
+    return (annotation as t.TSTypeAnnotation).typeAnnotation;
   }
 
-  if ('typeAnnotation' in annotation) {
+  if (typeof annotation === 'object' && annotation !== null && 'typeAnnotation' in (annotation as Record<string, unknown>)) {
     const inner = (annotation as { typeAnnotation?: t.Node }).typeAnnotation;
     if (inner && t.isTSTypeAnnotation(inner as t.Node)) {
       return (inner as t.TSTypeAnnotation).typeAnnotation;

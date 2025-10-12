@@ -22,19 +22,66 @@ export interface EnvironmentConfig {
 export interface ComponentInfo {
   name: string;
   filePath: string;
+  code: string;
   props?: string | null;
   imports: string[];
   hasTests: boolean;
 }
 
-export interface ComponentAnalysisResult {
-  component: ComponentInfo;
-  metadata: Record<string, unknown>;
+export type ComponentType = 'functional' | 'class';
+
+export interface PropDefinition {
+  name: string;
+  type?: string | null;
+  required: boolean;
+  defaultValue?: string | null;
+}
+
+export interface StateUsage {
+  name: string;
+  initialValue?: string | null;
+}
+
+export interface HookUsage {
+  name: string;
+  dependencies?: string[];
+  details?: string | null;
+}
+
+export interface EventHandler {
+  name: string;
+  handler: string;
+  element?: string | null;
+  eventType?: string | null;
+}
+
+export interface ImportDefinition {
+  source: string;
+  imported: string[];
+  namespace?: string | null;
+  defaultImport?: string | null;
+}
+
+export interface ComponentAnalysis {
+  name: string;
+  type: ComponentType;
+  props: PropDefinition[];
+  state: StateUsage[];
+  hooks: HookUsage[];
+  eventHandlers: EventHandler[];
+  imports: ImportDefinition[];
+  dataTestIds: string[];
+  complexity: number;
+  testingRecommendations: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface GeneratedTest {
-  fileName: string;
   content: string;
+  model: string;
+  prompt: string;
+  metadata?: Record<string, unknown>;
+  fileName?: string;
   relativePath?: string;
   summary?: string;
 }

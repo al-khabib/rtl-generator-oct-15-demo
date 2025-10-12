@@ -15,6 +15,7 @@ services:
       LLM_SERVICE_URL: http://llm-service:3002
       TEST_VALIDATION_URL: http://test-validation:3003
       REDIS_URL: redis://redis:6379
+      REQUEST_TIMEOUT_MS: 60000
     depends_on:
       - code-analysis
       - llm-service
@@ -56,7 +57,10 @@ services:
       NODE_ENV: development
       SERVICE_NAME: llm-service
       PORT: 3002
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      MODEL_NAME: llama3:8b
+      MAX_TOKENS: 512
+      TEMPERATURE: 0.3
       API_GATEWAY_URL: http://api-gateway:3000
       CODE_ANALYSIS_URL: http://code-analysis:3001
       TEST_VALIDATION_URL: http://test-validation:3003

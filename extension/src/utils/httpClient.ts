@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 import * as vscode from 'vscode';
 import { ApiResponse, ComponentInfo, GeneratedTest, ServiceStatus } from '../types';
 
-const DEFAULT_TIMEOUT = 10000;
+const DEFAULT_TIMEOUT = 60000;
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 500;
 
@@ -90,7 +90,7 @@ const checkHealth = async (): Promise<ServiceStatus> => {
   try {
     const response = await withRetry(async () => {
       const { data } = await client.get<ApiResponse<{ status: string; message?: string }>>(
-        '/health'
+        '/api/health'
       );
       return data;
     });

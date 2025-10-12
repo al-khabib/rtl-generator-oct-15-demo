@@ -19,6 +19,7 @@ const serviceClient = new ServiceClient();
 const componentSchema = z.object({
   name: z.string().min(1),
   filePath: z.string().min(1),
+  code: z.string().min(1, 'Component source code is required.'),
   props: z.string().nullable().optional(),
   imports: z.array(z.string()).default([]),
   hasTests: z.boolean()

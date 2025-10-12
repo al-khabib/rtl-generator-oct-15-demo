@@ -1,23 +1,26 @@
 import { ErrorRequestHandler } from 'express';
-import { AppError } from '../utils/appError';
+import { ServiceError } from '../types';
 import { logger } from '../utils/logger';
 
-interface ErrorResponse {
-  message: string;
-  details?: unknown;
-}
-
 export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
-  const status = err instanceof AppError ? err.statusCode : 500;
-  const response: ErrorResponse = {
-    message: err instanceof AppError ? err.message : 'Internal Server Error'
-  };
+  const serviceError =
+    err instanceof ServiceError
+      ? err
+      : new ServiceError(err instanceof Error ? err.message : 'Internal Server Error');
 
-  if (err instanceof AppError && err.details) {
-    response.details = err.details;
-  }
+  logger.error(`Request failed [${req.method} ${req.originalUrl}]`, {
+    statusCode: serviceError.statusCode,
+    code: serviceError.code,
+    details: serviceError.details,
+    stack: err instanceof Error ? err.stack : err
+  });
 
-  logger.error(`Request failed [${req.method} ${req.originalUrl}]`, err);
-
-  res.status(status).json(response);
+  res.status(serviceError.statusCode).json({
+    success: false,
+    error: {
+      message: serviceError.message,
+      code: serviceError.code,
+      details: serviceError.details
+    }
+  });
 };

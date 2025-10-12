@@ -2,7 +2,8 @@ import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import { config } from '../utils/config';
 import { logger } from '../utils/logger';
 import {
-  ComponentAnalysisResult,
+  ApiSuccessResponse,
+  ComponentAnalysis,
   ComponentInfo,
   GeneratedTest,
   ServiceError,
@@ -126,9 +127,9 @@ export class ServiceClient {
     };
   }
 
-  async analyzeCode(component: ComponentInfo, correlationId?: string): Promise<ComponentAnalysisResult> {
+  async analyzeCode(component: ComponentInfo, correlationId?: string): Promise<ComponentAnalysis> {
     return this.executeWithCircuit('code-analysis', correlationId, () =>
-      this.requestWithRetry<ComponentAnalysisResult>(
+      this.requestWithRetry<ApiSuccessResponse<ComponentAnalysis>>(
         this.codeAnalysisClient,
         {
           method: 'POST',
@@ -137,31 +138,31 @@ export class ServiceClient {
         },
         'code-analysis',
         correlationId
-      )
+      ).then((response) => response.data)
     );
   }
 
   async generateTest(
-    analysisResult: ComponentAnalysisResult,
+    analysisResult: ComponentAnalysis,
     correlationId?: string
   ): Promise<GeneratedTest> {
     return this.executeWithCircuit('llm-service', correlationId, () =>
-      this.requestWithRetry<GeneratedTest>(
+      this.requestWithRetry<ApiSuccessResponse<GeneratedTest>>(
         this.llmServiceClient,
         {
           method: 'POST',
-          url: '/api/generate-test',
-          data: analysisResult
+          url: '/api/generate',
+          data: { analysis: analysisResult }
         },
         'llm-service',
         correlationId
-      )
+      ).then((response) => response.data)
     );
   }
 
   async validateTest(generatedTest: GeneratedTest, correlationId?: string): Promise<ValidationResult> {
     return this.executeWithCircuit('test-validation', correlationId, () =>
-      this.requestWithRetry<ValidationResult>(
+      this.requestWithRetry<ApiSuccessResponse<ValidationResult>>(
         this.testValidationClient,
         {
           method: 'POST',
@@ -170,7 +171,7 @@ export class ServiceClient {
         },
         'test-validation',
         correlationId
-      )
+      ).then((response) => response.data)
     );
   }
 
